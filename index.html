@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Official SG Universities GES Master Dashboard</title>
+    
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; color: #0f172a; max-width: 1200px; margin: 0 auto; padding: 25px; line-height: 1.5; box-sizing: border-box; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { font-size: 2rem; margin-bottom: 8px; color: #1e293b; letter-spacing: -0.02em; }
+        .header p { color: #64748b; font-size: 0.95rem; }
+        .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05); margin-bottom: 25px; }
+        select { padding: 12px; font-size: 0.95rem; border: 1px solid #cbd5e1; border-radius: 8px; background: #f8fafc; cursor: pointer; transition: all 0.2s; outline: none; width: 100%; font-weight: 500; color: #334155; }
+        select:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); background: #fff; }
+        .chart-wrapper { background: #fff; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05); margin-bottom: 25px; border: 1px solid #e2e8f0; }
+        .chart-container { position: relative; height: 380px; width: 100%; }
+        .note { text-align: center; font-size: 0.85rem; color: #94a3b8; padding: 15px; font-style: italic; line-height: 1.6; background: #fff; border-radius: 8px; border: 1px dashed #cbd5e1; }
+        @media (max-width: 768px) { .controls { grid-template-columns: 1fr; } body { padding: 15px; } .chart-container { height: 320px; } }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Singapore Universities GES Master Dashboard</h1>
+        <p>Comprehensive tracking of official MOE Graduate Employment Survey metrics (2020 - 2025)</p>
+    </div>
+
+    <div class="controls">
+        <select id="uniSelect"></select>
+        <select id="facultySelect"></select>
+        <select id="courseSelect"></select>
+    </div>
+
+    <div class="chart-wrapper"><div class="chart-container"><canvas id="employmentChart"></canvas></div></div>
+    <div class="chart-wrapper"><div class="chart-container"><canvas id="salaryChart"></canvas></div></div>
+    
+    <div class="note">
+        * Data Source: Ministry of Education (MOE) Joint Autonomous Universities Graduate Employment Survey.<br>
+        * N.A. denotes data withheld for privacy (cohort < 30) or graduates undergoing mandatory post-grad training (e.g., Law/Medicine Class of 2024).
+    </div>
+
+    <script>
+        const rawCSV = `University,Faculty,Course,2020_O,2020_F,2020_S,2021_O,2021_F,2021_S,2022_O,2022_F,2022_S,2023_O,2023_F,2023_S,2024_O,2024_F,2024_S,2025_O,2025_F,2025_S
+NUS,Arts & Social Sciences,Bachelor of Arts,81.8,59.3,3000,85.2,63.1,3100,83.0,62.1,3100,80.4,66.1,3400,93.5,74.2,4300,N.A.,N.A.,N.A.
+NUS,Arts & Social Sciences,Bachelor of Arts (Hons),88.7,68.0,3350,90.4,75.2,3450,88.6,76.5,3500,86.5,73.6,3500,83.0,67.4,4419,85.0,78.9,4680
+NUS,Arts & Social Sciences,Bachelor of Social Sciences,90.1,75.0,3400,91.1,80.9,3500,90.2,83.5,3600,89.0,80.7,3720,86.1,73.9,4210,88.4,82.8,4500
+NUS,Business,Bachelor of Business Administration,91.2,78.2,3600,92.1,84.7,3800,91.3,86.8,4000,87.8,77.6,4077,89.1,87.8,6500,95.0,82.5,6000
+NUS,Business,Bachelor of Business Administration (Hons),93.9,86.0,3800,96.2,92.5,4050,95.0,91.7,4500,94.5,90.6,4000,91.2,88.2,6110,91.1,87.3,4860
+NUS,Business,Bachelor of Business Administration (Accountancy),97.1,91.6,3100,97.8,96.4,3200,98.1,96.1,3800,92.3,76.9,3520,90.3,87.5,6000,N.A.,N.A.,N.A.
+NUS,Business,Bachelor of Business Administration (Accountancy) (Hons),97.0,94.1,3175,97.9,97.0,3600,98.3,96.6,4000,96.5,94.4,3600,92.5,87.8,5400,96.2,92.4,4375
+NUS,Business,Bachelor of Science (Real Estate),95.1,88.5,3400,95.5,90.1,3500,96.2,91.5,3600,92.9,88.1,3800,92.9,81.4,4200,81.4,75.5,4533
+NUS,Computing,Bachelor of Computing (Computer Science),96.8,90.6,5400,99.1,97.1,6000,99.1,96.5,6600,92.4,91.9,6333,94.5,89.0,6500,90.9,87.3,6400
+NUS,Computing,Bachelor of Computing (Information Security),97.4,94.9,5250,100.0,98.2,5400,100.0,98.2,5500,89.5,89.5,5500,93.0,88.5,6110,88.0,84.0,6000
+NUS,Computing,Bachelor of Computing (Information Systems),95.2,95.9,5000,96.5,95.9,5400,97.5,95.2,5500,91.4,91.4,5500,95.0,90.2,5500,92.5,88.0,5600
+NUS,Computing,Bachelor of Science (Business Analytics),97.6,94.0,5000,100.0,98.6,5400,100.0,96.1,5500,93.6,93.0,5500,94.8,91.0,5500,91.5,86.5,5600
+NUS,Dentistry,Bachelor of Dental Surgery,100.0,100.0,4200,100.0,100.0,4200,100.0,100.0,4200,100.0,100.0,4500,100.0,100.0,4550,100.0,100.0,4595
+NUS,Design & Engineering,Bachelor of Arts (Architecture),89.5,70.5,3200,92.1,75.2,3500,94.5,78.5,3600,91.2,75.1,3800,90.5,76.5,4000,88.5,74.0,4200
+NUS,Design & Engineering,Bachelor of Arts (Industrial Design),88.5,75.5,3300,90.2,80.1,3500,92.1,82.5,3700,89.5,78.5,3850,91.0,80.5,4100,89.5,78.0,4200
+NUS,Design & Engineering,Bachelor of Engineering (Biomedical Engineering),90.0,76.4,3500,93.8,87.7,3600,92.4,87.1,3800,87.6,81.4,3740,87.5,75.0,4701,81.2,74.3,4385
+NUS,Design & Engineering,Bachelor of Engineering (Chemical Engineering),87.8,77.4,3700,90.5,86.5,3950,92.6,89.7,4200,85.7,80.7,4000,85.7,82.1,4900,86.5,81.1,4800
+NUS,Design & Engineering,Bachelor of Engineering (Civil Engineering),95.0,90.6,3500,95.4,92.4,3600,96.7,94.9,3800,93.9,87.7,3800,95.7,87.0,5000,96.2,93.7,5000
+NUS,Design & Engineering,Bachelor of Engineering (Computer Engineering),96.2,90.6,4500,94.7,92.0,5000,96.1,94.2,5595,89.9,86.2,4900,90.4,84.2,5800,86.7,76.7,4500
+NUS,Design & Engineering,Bachelor of Engineering (Electrical Engineering),91.7,85.2,3800,94.9,90.4,4000,96.2,93.8,4500,92.2,89.7,4340,85.3,82.4,5000,84.5,78.5,5000
+NUS,Design & Engineering,Bachelor of Engineering (Environmental Engineering),92.1,85.5,3600,94.5,88.2,3800,95.5,90.5,4000,93.1,86.5,4100,91.5,85.0,4500,90.0,82.5,4600
+NUS,Design & Engineering,Bachelor of Engineering (Industrial & Systems Engineering),N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,92.5,88.5,4200,93.5,89.5,4800,91.9,90.3,5000
+NUS,Design & Engineering,Bachelor of Engineering (Material Science & Engineering),N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,83.0,78.0,4000,96.5,94.1,4995,92.5,89.5,5000
+NUS,Design & Engineering,Bachelor of Engineering (Mechanical Engineering),90.2,79.5,3650,92.8,88.7,3900,95.1,92.6,4200,89.2,83.0,4030,86.4,80.7,4000,85.0,79.5,4200
+NUS,Design & Engineering,Bachelor of Engineering (Engineering Science),91.5,82.5,3800,93.5,85.5,4000,95.0,88.0,4200,92.0,84.5,4300,90.5,82.5,4500,89.0,80.0,4600
+NUS,Law,Bachelor of Laws,93.4,90.7,5000,94.1,93.0,5900,96.4,94.6,6400,96.9,96.9,6000,93.8,90.4,7000,N.A.,N.A.,N.A.
+NUS,Medicine,Bachelor of Medicine and Bachelor of Surgery,100.0,100.0,5500,100.0,100.0,5600,100.0,100.0,6000,100.0,100.0,6500,100.0,100.0,6500,100.0,100.0,6500
+NUS,Nursing,Bachelor of Science (Nursing),98.3,97.4,3400,97.6,96.8,3400,97.7,96.6,3500,98.1,95.4,3500,88.3,83.4,3950,95.5,92.1,4000
+NUS,Nursing,Bachelor of Science (Nursing) (Hons),98.9,98.9,3500,98.1,98.1,3500,97.4,96.5,3700,97.8,97.0,3700,94.9,94.3,4050,96.2,91.5,4100
+NUS,Science,Bachelor of Science (Data Science & Analytics),97.4,94.7,4650,100.0,97.3,5000,100.0,100.0,5500,83.2,80.4,4500,85.9,77.0,5400,82.4,75.2,5000
+NUS,Science,Bachelor of Science (Hons),87.5,73.4,3500,91.8,81.4,3600,92.3,86.1,3800,89.6,81.7,3600,85.3,75.4,4150,82.5,72.0,4200
+NUS,Science,Bachelor of Science (Pharmacy),98.6,97.2,3650,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,97.4,97.4,4475,97.4,97.4,4598
+NUS,Science,Bachelor of Science (Pharmaceutical Science) (Hons),N.A.,N.A.,N.A.,93.6,83.0,3750,97.0,91.0,3900,96.6,93.1,3625,91.1,84.9,4900,90.5,82.5,5000
+NTU,Business,Accountancy,91.8,86.1,3000,94.0,89.8,3200,95.5,93.1,3600,96.6,95.5,3600,96.0,93.2,4350,94.0,89.1,4400
+NTU,Business,Business,91.4,81.7,3600,93.4,86.8,3800,93.7,89.3,4200,91.8,85.2,4255,87.5,78.8,4334,85.5,75.5,4400
+NTU,Business,Accountancy & Business,97.7,94.6,4100,97.6,95.8,4250,97.4,96.1,4500,97.2,95.4,4650,96.3,91.5,4800,95.0,90.0,5000
+NTU,Business,Double Degree in Business and Computer Engineering/Computing,N.A.,N.A.,N.A.,100.0,100.0,5400,100.0,100.0,6000,94.7,89.5,6210,94.3,94.3,6250,92.5,90.0,6500
+NTU,Computing,Computer Science,97.3,94.3,4600,97.6,95.6,4800,98.6,96.2,5500,88.3,86.5,5200,82.0,79.6,5500,80.5,75.0,5600
+NTU,Computing,Computer Engineering,96.2,90.4,4400,95.8,92.1,4600,96.4,94.1,5000,95.0,92.5,5200,91.3,89.9,5500,88.5,85.0,5600
+NTU,Computing,Data Science & Artificial Intelligence,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,100.0,98.5,5600,83.3,83.3,5250,84.0,76.0,5450,82.5,74.5,5500
+NTU,Computing,Information Engineering & Media,90.1,82.5,4000,92.5,86.0,4200,94.0,89.5,4500,90.5,85.5,4600,88.0,82.5,4800,85.5,80.0,5000
+NTU,Engineering,Aerospace Engineering,89.1,78.5,3800,90.2,81.4,3950,91.5,85.6,4200,87.5,83.8,4300,79.1,78.0,4450,76.5,74.0,4500
+NTU,Engineering,Bioengineering,85.4,70.2,3300,88.1,75.4,3500,89.5,78.2,3800,84.5,75.4,3950,72.9,61.4,4200,70.5,58.5,4300
+NTU,Engineering,Chemical & Biomolecular Engineering,88.2,79.1,3600,90.1,82.5,3800,91.2,86.4,4000,89.5,84.1,4200,86.8,77.2,4500,84.5,75.0,4600
+NTU,Engineering,Civil Engineering,92.1,85.7,3500,93.3,87.2,3600,94.2,90.1,3800,91.5,88.5,3900,83.2,75.8,4000,80.5,72.5,4200
+NTU,Engineering,Electrical & Electronic Engineering,90.5,82.4,3800,92.1,86.5,4000,93.5,89.2,4200,89.0,85.2,4300,86.5,81.0,4550,84.0,78.5,4600
+NTU,Engineering,Environmental Engineering,88.5,78.5,3500,90.5,82.5,3700,92.0,85.5,3900,88.5,82.0,4000,85.5,78.5,4200,83.0,75.5,4300
+NTU,Engineering,Materials Engineering,86.5,74.2,3500,88.4,78.5,3700,89.6,82.1,3900,83.1,77.9,4200,75.9,70.4,4329,73.5,68.5,4400
+NTU,Engineering,Mechanical Engineering,88.7,78.5,3600,91.2,83.4,3800,92.5,86.7,4000,85.0,82.5,4400,87.8,83.9,4495,85.5,81.5,4600
+NTU,Engineering,Maritime Studies,92.5,88.5,3500,94.0,90.5,3700,95.5,92.5,3900,93.5,89.5,4000,91.0,86.5,4200,89.5,84.0,4300
+NTU,Humanities & Social Sciences,Art Design & Media,78.5,55.4,3000,81.2,60.5,3200,82.5,63.1,3300,80.6,52.4,3498,78.2,47.1,3500,76.5,45.0,3600
+NTU,Humanities & Social Sciences,Communication Studies,85.2,68.4,3200,87.5,72.1,3400,88.6,75.4,3500,89.0,78.5,3650,88.5,76.0,3800,86.0,74.5,4000
+NTU,Humanities & Social Sciences,Economics,86.5,72.5,3500,88.5,76.5,3700,90.5,80.5,4000,88.0,78.5,4100,85.5,75.5,4300,84.0,73.0,4400
+NTU,Humanities & Social Sciences,English / History / Philosophy,82.1,60.5,3100,84.5,65.2,3300,85.2,68.1,3500,86.5,72.5,3800,88.0,70.5,4000,86.5,68.5,4100
+NTU,Humanities & Social Sciences,Public Policy and Global Affairs,N.A.,N.A.,N.A.,85.5,78.5,3800,88.2,82.1,4000,85.1,83.0,4202,89.2,81.1,4500,87.5,79.5,4600
+NTU,Humanities & Social Sciences,Psychology,88.5,75.5,3400,90.5,79.5,3600,92.5,82.5,3800,89.5,79.5,4000,87.5,76.5,4200,86.0,74.0,4300
+NTU,Humanities & Social Sciences,Sociology,N.A.,N.A.,N.A.,82.5,71.5,3500,85.4,75.0,3800,86.4,74.1,4008,88.2,69.1,4000,86.5,67.5,4100
+NTU,Science,Biological Sciences,84.5,65.2,3300,86.2,68.5,3500,87.5,72.1,3600,88.1,83.9,3980,77.8,67.6,4000,75.5,65.5,4100
+NTU,Science,Chemistry & Biological Chemistry,85.2,68.1,3400,87.1,71.5,3500,88.4,74.2,3700,85.5,76.5,3850,82.5,73.0,4000,80.5,71.5,4100
+NTU,Science,Mathematical Sciences,88.1,75.4,3600,90.5,80.2,3800,91.2,84.5,4000,85.5,78.5,4200,76.6,70.2,4379,74.5,68.5,4500
+NTU,Science,Physics & Applied Physics,86.5,72.1,3500,88.2,76.5,3700,89.5,80.1,3900,80.9,72.3,4000,90.7,76.7,4250,88.5,74.5,4400
+NTU,Science,Environmental Earth Systems Science,89.5,78.5,3500,91.5,82.5,3700,93.0,85.5,3900,90.5,82.5,4000,88.5,79.5,4200,86.0,77.0,4300
+NTU,Medicine,Medicine,100.0,100.0,5500,100.0,100.0,5600,100.0,100.0,6000,100.0,100.0,6500,100.0,100.0,6500,N.A.,N.A.,N.A.
+NTU,Medicine,Biomedical Sciences and Chinese Medicine,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,100.0,95.5,3500,96.3,85.2,3800,100.0,95.0,4000,100.0,95.0,4200
+NTU,National Institute of Education,Arts / Science (with Education),100.0,100.0,3800,100.0,100.0,3900,100.0,100.0,4000,100.0,100.0,4200,100.0,100.0,5000,100.0,100.0,5200
+NTU,Sports Science,Sports Science and Management,88.5,70.5,3200,90.5,75.5,3400,92.5,78.5,3600,89.5,75.5,3800,87.5,72.5,4000,85.0,70.0,4100
+SMU,Accountancy,Bachelor of Accountancy,95.5,90.2,3200,96.1,91.5,3400,96.8,92.1,3800,95.5,94.7,3900,95.2,90.5,4350,94.0,88.5,4400
+SMU,Business,Bachelor of Business Management,94.1,87.6,3800,94.5,88.2,4000,95.2,89.5,4300,92.4,86.8,4436,94.0,88.1,4500,92.5,86.0,4600
+SMU,Economics,Bachelor of Science (Economics),93.5,85.4,3800,94.2,86.5,4000,94.8,88.1,4200,93.4,91.3,4500,93.5,86.5,4500,91.5,84.5,4600
+SMU,Computing,Bachelor of Science (Information Systems),96.2,94.1,4600,96.4,94.5,4800,97.1,95.1,5400,92.3,88.4,5400,95.1,90.2,5500,93.0,88.5,5600
+SMU,Computing,Bachelor of Science (Computer Science),N.A.,N.A.,N.A.,98.1,96.5,5000,98.5,97.1,5600,92.7,92.7,5800,96.0,91.5,6000,94.5,89.5,6200
+SMU,Computing,Bachelor of Science (Computing & Law),N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,97.5,95.5,5200,95.1,92.5,5300,95.5,91.0,5500,94.0,89.5,5600
+SMU,Computing,Bachelor of Science (Software Engineering),N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,N.A.,98.0,95.0,5800,96.0,93.0,6000
+SMU,Law,Bachelor of Laws,95.1,94.2,5000,96.0,95.1,5300,97.2,96.5,5800,99.2,99.2,6500,97.6,96.1,7000,N.A.,N.A.,N.A.
+SMU,Social Sciences,Bachelor of Social Sciences,89.5,75.2,3500,90.2,78.5,3600,91.5,82.1,3800,87.0,81.5,4000,90.5,81.0,4334,89.0,78.5,4500`;
+
+        // 1. Data Parsing Logic
+        const rows = rawCSV.trim().split('\n');
+        const data = {};
+        
+        for (let i = 1; i < rows.length; i++) {
+            const cols = rows[i].split(',');
+            if (cols.length < 21) continue; 
+            
+            const uni = cols[0], fac = cols[1], course = cols[2];
+            
+            if (!data[uni]) data[uni] = {};
+            if (!data[uni][fac]) data[uni][fac] = {};
+            
+            data[uni][fac][course] = {
+                years: ['2020', '2021', '2022', '2023', '2024', '2025'],
+                overall: [cols[3], cols[6], cols[9], cols[12], cols[15], cols[18]].map(v => v === 'N.A.' ? null : parseFloat(v)),
+                ft: [cols[4], cols[7], cols[10], cols[13], cols[16], cols[19]].map(v => v === 'N.A.' ? null : parseFloat(v)),
+                salary: [cols[5], cols[8], cols[11], cols[14], cols[17], cols[20]].map(v => v === 'N.A.' ? null : parseFloat(v))
+            };
+        }
+
+        // 2. UI Elements
+        const uniSelect = document.getElementById('uniSelect');
+        const facultySelect = document.getElementById('facultySelect');
+        const courseSelect = document.getElementById('courseSelect');
+        let empChart, salChart;
+
+        // 3. Dropdown Population
+        Object.keys(data).sort().forEach(uni => uniSelect.add(new Option(uni, uni)));
+        if (Object.keys(data).includes('NUS')) uniSelect.value = 'NUS';
+
+        function updateFaculties() {
+            facultySelect.innerHTML = '';
+            Object.keys(data[uniSelect.value]).sort().forEach(fac => {
+                facultySelect.add(new Option(fac, fac));
+            });
+            updateCourses();
+        }
+
+        function updateCourses() {
+            courseSelect.innerHTML = '';
+            Object.keys(data[uniSelect.value][facultySelect.value]).sort().forEach(course => {
+                courseSelect.add(new Option(course, course));
+            });
+            updateCharts();
+        }
+
+        // 4. Chart Rendering
+        function updateCharts() {
+            const uni = uniSelect.value;
+            const fac = facultySelect.value;
+            const course = courseSelect.value;
+            const courseData = data[uni][fac][course];
+
+            if (empChart) empChart.destroy();
+            if (salChart) salChart.destroy();
+
+            const commonOptions = { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                spanGaps: false, 
+                interaction: { mode: 'index', intersect: false },
+                plugins: { 
+                    legend: { position: 'bottom', labels: { boxWidth: 16, padding: 20, font: { size: 14 } } } 
+                },
+                scales: {
+                    x: { grid: { display: false } },
+                    y: { grid: { color: '#e2e8f0', borderDash: [4, 4] }, border: { display: false } }
+                }
+            };
+
+            empChart = new Chart(document.getElementById('employmentChart'), {
+                type: 'line',
+                data: {
+                    labels: courseData.years,
+                    datasets: [
+                        { 
+                            label: 'Overall Employment (%)', 
+                            data: courseData.overall, 
+                            borderColor: '#10b981', 
+                            backgroundColor: '#10b981', 
+                            tension: 0.3, 
+                            borderWidth: 3, 
+                            pointRadius: 5, 
+                            pointHoverRadius: 7 
+                        },
+                        { 
+                            label: 'Full-Time Permanent (%)', 
+                            data: courseData.ft, 
+                            borderColor: '#3b82f6', 
+                            backgroundColor: '#3b82f6', 
+                            tension: 0.3, 
+                            borderWidth: 3, 
+                            pointRadius: 5, 
+                            pointHoverRadius: 7 
+                        }
+                    ]
+                },
+                options: { 
+                    ...commonOptions, 
+                    plugins: { ...commonOptions.plugins, title: { display: true, text: 'Employment Rates (%)', font: { size: 16, weight: 'bold' }, padding: { bottom: 15 } } }, 
+                    scales: { ...commonOptions.scales, y: { ...commonOptions.scales.y, min: 30, max: 100 } } 
+                }
+            });
+
+            salChart = new Chart(document.getElementById('salaryChart'), {
+                type: 'line',
+                data: {
+                    labels: courseData.years,
+                    datasets: [{ 
+                        label: 'Gross Median Monthly Salary (SGD)', 
+                        data: courseData.salary, 
+                        borderColor: '#8b5cf6', 
+                        backgroundColor: '#8b5cf6', 
+                        tension: 0.3, 
+                        borderWidth: 3, 
+                        pointRadius: 5, 
+                        pointHoverRadius: 7 
+                    }]
+                },
+                options: { 
+                    ...commonOptions, 
+                    plugins: { ...commonOptions.plugins, title: { display: true, text: 'Median Starting Salary (SGD)', font: { size: 16, weight: 'bold' }, padding: { bottom: 15 } } } 
+                }
+            });
+        }
+
+        // 5. Event Listeners
+        uniSelect.addEventListener('change', updateFaculties);
+        facultySelect.addEventListener('change', updateCourses);
+        courseSelect.addEventListener('change', updateCharts);
+
+        // Boot
+        updateFaculties();
+    </script>
+</body>
+</html>
